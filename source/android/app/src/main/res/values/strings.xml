@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">PC Remote</string>
+
+    <string name="pcs_available">PCs available</string>
+    <string name="searching">Searching your network…</string>
+    <string name="found_one">1 PC found</string>
+    <string name="found_many">%1$d PCs found</string>
+    <string name="nothing_found">No PCs yet.\n\nMake sure remote_server.py is running\nand that your phone is on the same Wi‑Fi.</string>
+    <string name="scan_again">Scan again</string>
+    <string name="enter_ip">Enter an IP address instead</string>
+    <string name="last_used">Last used</string>
+
+    <string name="connecting">Connecting to %1$s…</string>
+    <string name="connected">Connected</string>
+    <string name="back_arrow">‹  PCs</string>
+
+    <string name="left_click">Left click</string>
+    <string name="right_click">Right click</string>
+
+    <string name="previous">Previous track</string>
+    <string name="play_pause">Play or pause</string>
+    <string name="next">Next track</string>
+    <string name="volume_down">Volume down</string>
+    <string name="volume_up">Volume up</string>
+    <string name="mute">Mute</string>
+
+    <string name="settings">Settings</string>
+    <string name="keyboard_mode">Keyboard</string>
+    <string name="screen_mode">Watch this PC\'s screen</string>
+    <string name="screen_connecting">Connecting to the screen…</string>
+    <string name="screen_unavailable">This PC is not sharing its screen</string>
+    <string name="trackpad_mode">Trackpad</string>
+    <string name="keyboard_hint">Whatever you type here is typed on the PC.</string>
+    <string name="keyboard_placeholder">Start typing…</string>
+    <string name="key_esc">Esc</string>
+    <string name="key_tab">Tab</string>
+    <string name="key_backspace">⌫</string>
+    <string name="key_enter">Enter ↵</string>
+    <string name="key_left">←</string>
+    <string name="key_right">→</string>
+    <string name="key_up">↑</string>
+    <string name="key_down">↓</string>
+    <string name="pointer_sensitivity">Pointer sensitivity</string>
+    <string name="pointer_sensitivity_hint">How far the pointer travels for the same swipe.</string>
+    <string name="scroll_speed">Scroll speed</string>
+    <string name="scroll_speed_hint">How much two fingers scroll for the same swipe.</string>
+    <string name="settings_live_hint">Changes apply straight away — close this and try the trackpad.</string>
+    <string name="slower">Slower</string>
+    <string name="faster">Faster</string>
+    <string name="reset">Reset</string>
+    <string name="done">Done</string>
+
+    <string name="manual_title">Connect by IP</string>
+    <string name="manual_hint">192.168.1.20</string>
+    <string name="connect">Connect</string>
+    <string name="cancel">Cancel</string>
+</resources>

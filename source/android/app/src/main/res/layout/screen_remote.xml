@@ -1,0 +1,391 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:fitsSystemWindows="true"
+    android:paddingStart="14dp"
+    android:paddingEnd="14dp"
+    android:paddingTop="16dp"
+    android:paddingBottom="14dp">
+
+    <!-- header -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/btn_back"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_button"
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp"
+            android:paddingTop="8dp"
+            android:paddingBottom="8dp"
+            android:text="@string/back_arrow"
+            android:textColor="@color/text"
+            android:textSize="15sp" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="10dp"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/connected_name"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textColor="@color/text"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/connected_state"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/connected"
+                android:textColor="@color/online"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <ImageButton
+            android:id="@+id/btn_screen"
+            android:layout_width="44dp"
+            android:layout_height="42dp"
+            android:layout_marginStart="4dp"
+            android:background="@drawable/bg_button"
+            android:contentDescription="@string/screen_mode"
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_monitor" />
+
+        <ImageButton
+            android:id="@+id/btn_keyboard"
+            android:layout_width="44dp"
+            android:layout_height="42dp"
+            android:layout_marginStart="4dp"
+            android:background="@drawable/bg_button"
+            android:contentDescription="@string/keyboard_mode"
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_keyboard" />
+
+        <ImageButton
+            android:id="@+id/btn_settings"
+            android:layout_width="44dp"
+            android:layout_height="42dp"
+            android:layout_marginStart="4dp"
+            android:background="@drawable/bg_button"
+            android:contentDescription="@string/settings"
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_settings" />
+    </LinearLayout>
+
+    <!-- monitor tabs, only while the screen is being watched -->
+    <HorizontalScrollView
+        android:id="@+id/monitor_tabs_scroll"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:fillViewport="true"
+        android:scrollbars="none"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:id="@+id/monitor_tabs"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal" />
+    </HorizontalScrollView>
+
+    <!-- main area: trackpad, or the keyboard panel when that mode is on -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginTop="14dp"
+        android:layout_weight="1">
+
+        <!-- behind the trackpad on purpose: the trackpad stays on top as a
+             transparent gesture layer over the picture -->
+        <com.etzify.pcremote.ScreenView
+            android:id="@+id/screen_view"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:visibility="gone" />
+
+        <com.etzify.pcremote.TrackpadView
+            android:id="@+id/trackpad"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+        <LinearLayout
+            android:id="@+id/keyboard_panel"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@drawable/bg_card"
+            android:orientation="vertical"
+            android:padding="14dp"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/keyboard_hint"
+                android:textColor="@color/text_dim"
+                android:textSize="12sp" />
+
+            <EditText
+                android:id="@+id/key_input"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_marginTop="10dp"
+                android:layout_weight="1"
+                android:background="@null"
+                android:gravity="top"
+                android:hint="@string/keyboard_placeholder"
+                android:inputType="textMultiLine|textNoSuggestions"
+                android:textColor="@color/text"
+                android:textColorHint="@color/text_dim"
+                android:textSize="17sp" />
+
+            <!-- editing keys -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="46dp"
+                android:layout_marginTop="8dp"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/key_esc"
+                    style="?android:attr/borderlessButtonStyle"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_button"
+                    android:text="@string/key_esc"
+                    android:textAllCaps="false"
+                    android:textColor="@color/text"
+                    android:textSize="13sp" />
+
+                <Button
+                    android:id="@+id/key_tab"
+                    style="?android:attr/borderlessButtonStyle"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_marginStart="8dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_button"
+                    android:text="@string/key_tab"
+                    android:textAllCaps="false"
+                    android:textColor="@color/text"
+                    android:textSize="13sp" />
+
+                <Button
+                    android:id="@+id/key_backspace"
+                    style="?android:attr/borderlessButtonStyle"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_marginStart="8dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_button"
+                    android:text="@string/key_backspace"
+                    android:textAllCaps="false"
+                    android:textColor="@color/text"
+                    android:textSize="15sp" />
+
+                <Button
+                    android:id="@+id/key_enter"
+                    style="?android:attr/borderlessButtonStyle"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_marginStart="8dp"
+                    android:layout_weight="1.4"
+                    android:background="@drawable/bg_button_accent"
+                    android:text="@string/key_enter"
+                    android:textAllCaps="false"
+                    android:textColor="@color/text"
+                    android:textSize="15sp" />
+            </LinearLayout>
+
+            <!-- arrow keys -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="46dp"
+                android:layout_marginTop="8dp"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/key_left"
+                    style="?android:attr/borderlessButtonStyle"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_button"
+                    android:text="@string/key_left"
+                    android:textColor="@color/text"
+                    android:textSize="16sp" />
+
+                <Button
+                    android:id="@+id/key_up"
+                    style="?android:attr/borderlessButtonStyle"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_marginStart="8dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_button"
+                    android:text="@string/key_up"
+                    android:textColor="@color/text"
+                    android:textSize="16sp" />
+
+                <Button
+                    android:id="@+id/key_down"
+                    style="?android:attr/borderlessButtonStyle"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_marginStart="8dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_button"
+                    android:text="@string/key_down"
+                    android:textColor="@color/text"
+                    android:textSize="16sp" />
+
+                <Button
+                    android:id="@+id/key_right"
+                    style="?android:attr/borderlessButtonStyle"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_marginStart="8dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_button"
+                    android:text="@string/key_right"
+                    android:textColor="@color/text"
+                    android:textSize="16sp" />
+            </LinearLayout>
+        </LinearLayout>
+    </FrameLayout>
+
+    <!-- mouse and media controls, hidden while typing -->
+    <LinearLayout
+        android:id="@+id/mouse_controls"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="60dp"
+            android:layout_marginTop="12dp"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/btn_left_click"
+                style="?android:attr/borderlessButtonStyle"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1.6"
+                android:background="@drawable/bg_button"
+                android:text="@string/left_click"
+                android:textAllCaps="false"
+                android:textColor="@color/text"
+                android:textSize="14sp" />
+
+            <Button
+                android:id="@+id/btn_right_click"
+                style="?android:attr/borderlessButtonStyle"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_marginStart="10dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_button"
+                android:text="@string/right_click"
+                android:textAllCaps="false"
+                android:textColor="@color/text"
+                android:textSize="14sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/bg_card"
+            android:gravity="center"
+            android:orientation="horizontal"
+            android:paddingTop="12dp"
+            android:paddingBottom="12dp">
+
+            <ImageButton
+                android:id="@+id/btn_prev"
+                android:layout_width="64dp"
+                android:layout_height="56dp"
+                android:background="@drawable/bg_button"
+                android:contentDescription="@string/previous"
+                android:scaleType="centerInside"
+                android:src="@drawable/ic_prev" />
+
+            <ImageButton
+                android:id="@+id/btn_play"
+                android:layout_width="92dp"
+                android:layout_height="56dp"
+                android:layout_marginStart="12dp"
+                android:layout_marginEnd="12dp"
+                android:background="@drawable/bg_button_accent"
+                android:contentDescription="@string/play_pause"
+                android:scaleType="centerInside"
+                android:src="@drawable/ic_play_pause" />
+
+            <ImageButton
+                android:id="@+id/btn_next"
+                android:layout_width="64dp"
+                android:layout_height="56dp"
+                android:background="@drawable/bg_button"
+                android:contentDescription="@string/next"
+                android:scaleType="centerInside"
+                android:src="@drawable/ic_next" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:layout_marginTop="10dp"
+            android:orientation="horizontal">
+
+            <ImageButton
+                android:id="@+id/btn_vol_down"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:background="@drawable/bg_button"
+                android:contentDescription="@string/volume_down"
+                android:scaleType="centerInside"
+                android:src="@drawable/ic_vol_down" />
+
+            <ImageButton
+                android:id="@+id/btn_mute"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_marginStart="10dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_button"
+                android:contentDescription="@string/mute"
+                android:scaleType="centerInside"
+                android:src="@drawable/ic_mute" />
+
+            <ImageButton
+                android:id="@+id/btn_vol_up"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_marginStart="10dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_button"
+                android:contentDescription="@string/volume_up"
+                android:scaleType="centerInside"
+                android:src="@drawable/ic_vol_up" />
+        </LinearLayout>
+    </LinearLayout>
+
+</LinearLayout>

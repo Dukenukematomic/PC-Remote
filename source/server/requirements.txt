@@ -1,0 +1,3 @@
+# Optional. On Windows the server falls back to a built-in ctypes backend if
+# pynput is missing, so you can run it with no installs at all.
+pynput>=1.7
