@@ -1,0 +1,57 @@
+PC REMOTE
+=========
+
+Turn your phone into a trackpad and media remote for this PC.
+
+
+ON THE PC
+---------
+Double-click "Start PC Remote.bat" and leave the window open.
+
+The first run pops up a Windows Firewall prompt. Tick "Private networks"
+and click Allow. If you miss it the phone will not find the PC; to fix it,
+run these two commands in an admin Command Prompt:
+
+  netsh advfirewall firewall add rule name="PC Remote" dir=in action=allow protocol=TCP localport=7712
+  netsh advfirewall firewall add rule name="PC Remote Discovery" dir=in action=allow protocol=UDP localport=7713
+
+Needs Python 3 installed. No other setup.
+
+
+ON THE PHONE
+------------
+1. Copy PCRemote.apk to the phone and open it. Android will ask you to
+   allow installing from this source - that is expected.
+2. Put the phone on the SAME Wi-Fi as this PC.
+3. Open "PC Remote". This PC appears under "PCs available". Tap it.
+
+It remembers your choice and reconnects by itself next time.
+
+
+USING IT
+--------
+  One finger slide ............ move the pointer
+  One finger tap .............. left click
+  Two finger tap .............. right click
+  Two finger slide ............ scroll
+  Double tap, hold, slide ..... click and drag
+
+Buttons for left/right click, previous, play/pause, next, and volume.
+The gear icon adjusts pointer sensitivity and scroll speed.
+
+
+IF NO PCs SHOW UP
+-----------------
+- The server window must be open on the PC.
+- Phone and PC must be on the same network. Guest Wi-Fi and networks with
+  "client isolation" block devices from seeing each other.
+- Check the firewall rules above.
+- Or tap "Enter an IP address instead" and type the PC's IP, which the
+  server window shows.
+
+
+NOTE
+----
+There is no password. Anyone on the same network who can reach port 7712
+can move this PC's mouse. Use it on a network you trust and close the
+server window when you are done.
