@@ -3,7 +3,12 @@ package com.etzify.pcremote;
 import android.os.Handler;
 import android.os.Looper;
 
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import java.io.BufferedOutputStream;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.Socket;
@@ -31,6 +36,12 @@ public class RemoteClient {
         void onConnected(String hostName);
 
         void onDisconnected(String reason);
+
+        /**
+         * What the server said about itself in its welcome. screenPort is 0
+         * when this PC is not sharing its screen.
+         */
+        void onServerInfo(String hostName, int screenPort);
     }
 
     private final Handler main = new Handler(Looper.getMainLooper());
@@ -211,6 +222,7 @@ public class RemoteClient {
             s.setTcpNoDelay(true);
             socket = s;
             out = new BufferedOutputStream(s.getOutputStream(), 4096);
+            startReader(s);
             write(out, "{\"t\":\"hello\"}");
         } catch (Exception e) {
             running = false;
@@ -255,6 +267,50 @@ public class RemoteClient {
             }
         } finally {
             closeSocket();
+        }
+    }
+
+    /**
+     * Drains the server's replies. The welcome is the only one that carries
+     * anything we act on, but the stream has to be read regardless or the
+     * heartbeat pongs would sit in the socket buffer forever.
+     */
+    private void startReader(final Socket s) {
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    BufferedReader in = new BufferedReader(
+                            new InputStreamReader(s.getInputStream(),
+                                    StandardCharsets.UTF_8), 1024);
+                    String line;
+                    while (running && (line = in.readLine()) != null) {
+                        handleReply(line);
+                    }
+                } catch (Exception ignored) {
+                    // The write side reports the disconnect; nothing to add.
+                }
+            }
+        }, "pc-remote-reader").start();
+    }
+
+    private void handleReply(String line) {
+        line = line.trim();
+        if (line.isEmpty()) return;
+        try {
+            JSONObject msg = new JSONObject(line);
+            if (!"welcome".equals(msg.optString("t"))) return;
+            final String name = msg.optString("host", "");
+            final int screenPort = msg.optInt("screen", 0);
+            final Listener l = listener;
+            if (l == null) return;
+            main.post(new Runnable() {
+                @Override
+                public void run() {
+                    if (running) l.onServerInfo(name, screenPort);
+                }
+            });
+        } catch (JSONException ignored) {
         }
     }
 

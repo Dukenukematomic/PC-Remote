@@ -495,18 +495,32 @@ public class MainActivity extends Activity implements RemoteClient.Listener {
         discovery.start(new Discovery.Listener() {
             @Override
             public void onPcsFound(List<Discovery.Pc> found) {
-                for (Discovery.Pc pc : found) {
-                    if (!pcs.contains(pc)) pcs.add(pc);
-                }
+                for (Discovery.Pc pc : found) mergePc(pc);
                 refreshList();
             }
         });
     }
 
-    /** Adds a PC we already know about without waiting for the next probe. */
+    /**
+     * Adds a PC, or upgrades one we already listed.
+     *
+     * Two entries for the same host are equal even if one of them does not
+     * know the screen port yet, so a seeded entry must give way to a real
+     * discovery reply rather than silently keeping the gap.
+     */
+    private void mergePc(Discovery.Pc pc) {
+        int at = pcs.indexOf(pc);
+        if (at < 0) {
+            pcs.add(pc);
+        } else if (pc.screenPort > 0 && pcs.get(at).screenPort <= 0) {
+            pcs.set(at, pc);
+        }
+    }
+
+    /** Lists a PC we already know about without waiting for the next probe. */
     private void addPc(Discovery.Pc pc) {
-        if (pc == null || pcs.contains(pc)) return;
-        pcs.add(pc);
+        if (pc == null) return;
+        mergePc(pc);
         refreshList();
     }
 
@@ -585,8 +599,29 @@ public class MainActivity extends Activity implements RemoteClient.Listener {
         discovery.stop();
         connectedName.setText(pendingName != null ? pendingName : host);
         connectedState.setText(R.string.connected);
+        // Corrected a moment later by the welcome, whatever we guessed here.
+        screenToggle.setVisibility(
+                connectedPc != null && connectedPc.screenPort > 0
+                        ? View.VISIBLE : View.GONE);
         flipper.setDisplayedChild(SCREEN_REMOTE);
         keepScreenOn(true);
+    }
+
+    /**
+     * The server's own account of itself, which arrives on every connection
+     * however it started. Discovery may never have been consulted -- a saved
+     * PC reconnected at launch, or an address typed by hand -- so this is
+     * what actually establishes whether the screen can be watched.
+     */
+    @Override
+    public void onServerInfo(String hostName, int screenPort) {
+        if (connectedPc == null) return;
+        if (screenPort == connectedPc.screenPort) return;
+
+        connectedPc = new Discovery.Pc(connectedPc.name, connectedPc.host,
+                connectedPc.port, screenPort);
+        prefs.edit().putInt(KEY_SCREEN, screenPort).apply();
+        screenToggle.setVisibility(screenPort > 0 ? View.VISIBLE : View.GONE);
     }
 
     @Override
