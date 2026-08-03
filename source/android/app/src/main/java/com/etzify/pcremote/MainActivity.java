@@ -61,7 +61,8 @@ public class MainActivity extends Activity implements RemoteClient.Listener {
     private PcAdapter adapter;
 
     private View keyboardPanel;
-    private View mouseControls;
+    private View mediaControls;
+    private View stage;
     private ImageButton keyboardToggle;
     private EditText keyInput;
     private boolean keyboardMode;
@@ -98,7 +99,8 @@ public class MainActivity extends Activity implements RemoteClient.Listener {
         connectedState = findViewById(R.id.connected_state);
         trackpad = findViewById(R.id.trackpad);
         keyboardPanel = findViewById(R.id.keyboard_panel);
-        mouseControls = findViewById(R.id.mouse_controls);
+        mediaControls = findViewById(R.id.media_controls);
+        stage = findViewById(R.id.stage);
         keyboardToggle = findViewById(R.id.btn_keyboard);
         keyInput = findViewById(R.id.key_input);
         screenView = findViewById(R.id.screen_view);
@@ -107,6 +109,15 @@ public class MainActivity extends Activity implements RemoteClient.Listener {
         monitorTabs = findViewById(R.id.monitor_tabs);
 
         trackpad.setClient(client);
+        // The picture sits at the top of the stage and the trackpad covers the
+        // whole of it, so the card has to start wherever the picture ends.
+        screenView.addOnLayoutChangeListener(new View.OnLayoutChangeListener() {
+            @Override
+            public void onLayoutChange(View v, int l, int t, int r, int b,
+                                       int ol, int ot, int or_, int ob) {
+                if (screenMode) trackpad.setCardTop(b);
+            }
+        });
         screenView.setRecycler(new ScreenView.FrameRecycler() {
             @Override
             public void release(android.graphics.Bitmap frame) {
@@ -210,13 +221,13 @@ public class MainActivity extends Activity implements RemoteClient.Listener {
         screenMode = on;
         screenView.setVisibility(on ? View.VISIBLE : View.GONE);
         trackpad.setTransparent(on);
-        monitorTabsScroll.setVisibility(
-                on && monitorTabs.getChildCount() > 1 ? View.VISIBLE : View.GONE);
+        updateMonitorTabs();
         screenToggle.setBackgroundResource(on ? R.drawable.bg_button_accent
                 : R.drawable.bg_button);
 
+        if (!on) trackpad.setCardTop(0);
+
         if (on) {
-            setKeyboardMode(false);          // the two modes share the space
             screenView.setStatus(getString(R.string.screen_connecting));
             startScreenStream(currentMonitor);
             screenStream.fetchMonitors(new ScreenStream.MonitorsListener() {
@@ -264,7 +275,7 @@ public class MainActivity extends Activity implements RemoteClient.Listener {
         monitorList.clear();
         monitorList.addAll(monitors);
         if (monitors.size() < 2) {
-            monitorTabsScroll.setVisibility(View.GONE);
+            updateMonitorTabs();
             return;
         }
 
@@ -298,7 +309,13 @@ public class MainActivity extends Activity implements RemoteClient.Listener {
             monitorTabs.addView(tab);
         }
 
-        monitorTabsScroll.setVisibility(screenMode ? View.VISIBLE : View.GONE);
+        updateMonitorTabs();
+    }
+
+    private void updateMonitorTabs() {
+        boolean show = screenMode && !keyboardMode
+                && monitorTabs.getChildCount() > 1;
+        monitorTabsScroll.setVisibility(show ? View.VISIBLE : View.GONE);
     }
 
     private void selectMonitor(int id) {
@@ -321,10 +338,7 @@ public class MainActivity extends Activity implements RemoteClient.Listener {
         keyButton(R.id.key_esc, "esc");
         keyButton(R.id.key_tab, "tab");
         keyButton(R.id.key_backspace, "backspace");
-        keyButton(R.id.key_left, "left");
-        keyButton(R.id.key_right, "right");
-        keyButton(R.id.key_up, "up");
-        keyButton(R.id.key_down, "down");
+        keyButton(R.id.key_delete, "delete");
 
         // Enter also empties the box, so it reads like a fresh line each time.
         findViewById(R.id.key_enter).setOnClickListener(new View.OnClickListener() {
@@ -407,13 +421,19 @@ public class MainActivity extends Activity implements RemoteClient.Listener {
         typedSoFar = next;
     }
 
+    /**
+     * The keyboard takes the place of the media controls and nothing else.
+     * The trackpad, the mouse buttons and the screen all stay where they are;
+     * the trackpad simply gives up height, since it is the only thing on the
+     * screen that can be any size at all.
+     */
     private void setKeyboardMode(boolean on) {
-        // Both modes want the same area, so turning one on retires the other.
-        if (on && screenMode) setScreenMode(false);
         keyboardMode = on;
         keyboardPanel.setVisibility(on ? View.VISIBLE : View.GONE);
-        trackpad.setVisibility(on ? View.GONE : View.VISIBLE);
-        mouseControls.setVisibility(on ? View.GONE : View.VISIBLE);
+        mediaControls.setVisibility(on ? View.GONE : View.VISIBLE);
+        // With the soft keyboard up as well there is very little height left,
+        // and picking a monitor is not something you do mid-sentence.
+        updateMonitorTabs();
         keyboardToggle.setImageResource(on ? R.drawable.ic_mouse
                 : R.drawable.ic_keyboard);
         keyboardToggle.setBackgroundResource(on ? R.drawable.bg_button_accent

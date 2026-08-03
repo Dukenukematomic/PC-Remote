@@ -56,6 +56,7 @@ public class TrackpadView extends View {
     private boolean touching;
     private float touchX, touchY;
     private boolean transparent;
+    private int cardTop;
 
     private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint border = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -118,6 +119,19 @@ public class TrackpadView extends View {
         invalidate();
     }
 
+    /**
+     * Where the picture above ends, in pixels down from the top.
+     *
+     * A 16:9 desktop cannot fill a tall phone, so whatever is left under it
+     * gets the trackpad card drawn on it. The whole view still takes touches
+     * either way -- this only decides how much of it looks like a trackpad.
+     */
+    public void setCardTop(int top) {
+        if (cardTop == top) return;
+        cardTop = top;
+        invalidate();
+    }
+
     private float dp(float v) {
         return v * density;
     }
@@ -127,22 +141,31 @@ public class TrackpadView extends View {
     @Override
     protected void onDraw(Canvas canvas) {
         float inset = dp(1f);
-        bounds.set(inset, inset, getWidth() - inset, getHeight() - inset);
         float radius = dp(18f);
+        // With a picture above, the card covers only what is left below it.
+        float top = transparent ? cardTop + dp(10f) : inset;
+        float bottom = getHeight() - inset;
+        boolean showCard = bottom - top > dp(40f);
 
-        if (!transparent) {
+        if (showCard) {
+            bounds.set(inset, top, getWidth() - inset, bottom);
             canvas.drawRoundRect(bounds, radius, radius, fill);
             canvas.drawRoundRect(bounds, radius, radius, border);
         }
 
         if (touching) {
             canvas.drawCircle(touchX, touchY, dp(26f), glow);
-        } else if (!transparent) {
-            float cy = getHeight() / 2f;
-            canvas.drawText("Slide to move the pointer",
-                    getWidth() / 2f, cy - dp(10f), hint);
-            canvas.drawText("Tap to click  ·  Two fingers to scroll",
-                    getWidth() / 2f, cy + dp(14f), hint);
+        } else if (showCard) {
+            float cy = (top + bottom) / 2f;
+            if (bottom - top > dp(80f)) {
+                canvas.drawText("Slide to move the pointer",
+                        getWidth() / 2f, cy - dp(10f), hint);
+                canvas.drawText("Tap to click  ·  Two fingers to scroll",
+                        getWidth() / 2f, cy + dp(14f), hint);
+            } else {
+                canvas.drawText("Slide to move  ·  Tap to click",
+                        getWidth() / 2f, cy + dp(4f), hint);
+            }
         }
     }
 

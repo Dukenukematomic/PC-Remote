@@ -26,6 +26,8 @@ public class ScreenView extends View {
     private Bitmap frame;
     private FrameRecycler recycler;
     private String status = "";
+    /** Width over height of what we are showing; 16:9 until a frame lands. */
+    private float aspect = 16f / 9f;
 
     private final Paint bitmapPaint = new Paint(Paint.FILTER_BITMAP_FLAG);
     private final Paint backdrop = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -62,11 +64,43 @@ public class ScreenView extends View {
         invalidate();
     }
 
+    /**
+     * Takes only the height the picture actually needs.
+     *
+     * Filling the space and letterboxing inside it left broad black bands
+     * above and below a 16:9 desktop on a tall phone, and pushed the buttons
+     * off the bottom. Measuring to the picture's own shape gives that space
+     * back to the controls.
+     */
+    @Override
+    protected void onMeasure(int widthSpec, int heightSpec) {
+        int width = MeasureSpec.getSize(widthSpec);
+        int heightMode = MeasureSpec.getMode(heightSpec);
+        int heightAvailable = MeasureSpec.getSize(heightSpec);
+
+        int height = aspect > 0 ? Math.round(width / aspect) : heightAvailable;
+        if (heightMode == MeasureSpec.EXACTLY) {
+            height = heightAvailable;
+        } else if (heightMode == MeasureSpec.AT_MOST) {
+            height = Math.min(height, heightAvailable);
+        }
+        setMeasuredDimension(width, Math.max(1, height));
+    }
+
     /** Shows a new frame and returns the old one to the pool. */
     public void setFrame(Bitmap next) {
         Bitmap previous = frame;
         frame = next;
         status = "";
+
+        if (next != null && next.getHeight() > 0) {
+            float next_aspect = next.getWidth() / (float) next.getHeight();
+            // Only a real change is worth a re-layout; every frame would be.
+            if (Math.abs(next_aspect - aspect) > 0.01f) {
+                aspect = next_aspect;
+                requestLayout();
+            }
+        }
         invalidate();
         // Safe to reuse now: the swap happened on the same thread that draws,
         // so nothing is still reading the old bitmap.

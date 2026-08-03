@@ -36,11 +36,8 @@
     <string name="key_esc">Esc</string>
     <string name="key_tab">Tab</string>
     <string name="key_backspace">⌫</string>
+    <string name="key_delete">Del</string>
     <string name="key_enter">Enter ↵</string>
-    <string name="key_left">←</string>
-    <string name="key_right">→</string>
-    <string name="key_up">↑</string>
-    <string name="key_down">↓</string>
     <string name="pointer_sensitivity">Pointer sensitivity</string>
     <string name="pointer_sensitivity_hint">How far the pointer travels for the same swipe.</string>
     <string name="scroll_speed">Scroll speed</string>

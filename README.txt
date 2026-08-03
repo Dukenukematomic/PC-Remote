@@ -58,10 +58,15 @@ to turn it on, again to turn it off.
 
 KEYBOARD MODE
 -------------
-The keyboard icon switches the trackpad for a text box. Anything you
-type there is typed on the PC as you go, including backspace and
-autocorrect changes. There are also keys for Esc, Tab, Backspace, Enter
-and the four arrows.
+The keyboard icon puts a text box where the media controls were.
+Everything else stays put - the trackpad, the click buttons and the
+screen if you are watching it - so you can type, click and move the
+pointer without switching back and forth. The trackpad gives up some
+height to make room.
+
+Anything you type is typed on the PC as you go, including backspace and
+autocorrect changes. There are keys for Esc, Tab, Backspace, Del and
+Enter.
 
 Click into the box you want to type into on the PC first. The server
 types into whatever already has focus and never steals it, so nothing
