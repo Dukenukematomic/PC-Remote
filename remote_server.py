@@ -21,6 +21,10 @@ Protocol: newline-delimited JSON, one object per line.
     {"t":"up","b":"left"}              release (drag end)
     {"t":"k","k":"play"}               media key
                                        play|next|prev|volup|voldown|mute
+    {"t":"type","s":"hello"}           type a string of text
+    {"t":"key","k":"enter"}            named key
+                                       enter|backspace|tab|esc|delete|space
+                                       up|down|left|right|home|end|pgup|pgdn
 
 Usage:
     python remote_server.py                 # small status window
@@ -42,6 +46,9 @@ DEFAULT_PORT = 7712
 DISCOVERY_PORT = 7713
 DISCOVERY_MAGIC = "PCREMOTE-DISCOVER-1"
 PROTOCOL_VERSION = 1
+
+# One message should never be able to hold the keyboard hostage.
+MAX_TYPE_CHARS = 512
 
 
 # --------------------------------------------------------------------------
@@ -73,6 +80,12 @@ class InputBackend:
     def media(self, key):
         raise NotImplementedError
 
+    def type_text(self, text):
+        raise NotImplementedError
+
+    def key(self, name):
+        raise NotImplementedError
+
 
 class PynputBackend(InputBackend):
     """Cross-platform backend. Requires `pip install pynput`."""
@@ -98,6 +111,22 @@ class PynputBackend(InputBackend):
             "voldown": Key.media_volume_down,
             "mute": Key.media_volume_mute,
         }
+        self._named = {
+            "enter": Key.enter,
+            "backspace": Key.backspace,
+            "tab": Key.tab,
+            "esc": Key.esc,
+            "delete": Key.delete,
+            "space": Key.space,
+            "up": Key.up,
+            "down": Key.down,
+            "left": Key.left,
+            "right": Key.right,
+            "home": Key.home,
+            "end": Key.end,
+            "pgup": Key.page_up,
+            "pgdn": Key.page_down,
+        }
 
     def move(self, dx, dy):
         self._mouse.move(int(round(dx)), int(round(dy)))
@@ -118,6 +147,16 @@ class PynputBackend(InputBackend):
         self._keyboard.press(k)
         self._keyboard.release(k)
 
+    def type_text(self, text):
+        self._keyboard.type(text)
+
+    def key(self, name):
+        k = self._named.get(name)
+        if k is None:
+            return
+        self._keyboard.press(k)
+        self._keyboard.release(k)
+
 
 class WindowsBackend(InputBackend):
     """Zero-dependency Windows backend built on SendInput via ctypes."""
@@ -132,7 +171,9 @@ class WindowsBackend(InputBackend):
     WHEEL, HWHEEL = 0x0800, 0x1000
     WHEEL_DELTA = 120
 
+    KEYEVENTF_EXTENDEDKEY = 0x0001
     KEYEVENTF_KEYUP = 0x0002
+    KEYEVENTF_UNICODE = 0x0004
 
     VK = {
         "play": 0xB3,      # VK_MEDIA_PLAY_PAUSE
@@ -142,6 +183,28 @@ class WindowsBackend(InputBackend):
         "voldown": 0xAE,   # VK_VOLUME_DOWN
         "mute": 0xAD,      # VK_VOLUME_MUTE
     }
+
+    NAMED_VK = {
+        "backspace": 0x08,
+        "tab": 0x09,
+        "enter": 0x0D,
+        "esc": 0x1B,
+        "space": 0x20,
+        "pgup": 0x21,
+        "pgdn": 0x22,
+        "end": 0x23,
+        "home": 0x24,
+        "left": 0x25,
+        "up": 0x26,
+        "right": 0x27,
+        "down": 0x28,
+        "delete": 0x2E,
+    }
+
+    # Keys that live on the grey navigation cluster need the extended flag or
+    # applications read them as their numpad twins.
+    EXTENDED = {"pgup", "pgdn", "end", "home", "left", "up", "right", "down",
+                "delete"}
 
     def __init__(self):
         import ctypes
@@ -192,9 +255,23 @@ class WindowsBackend(InputBackend):
         self._user32.SendInput(1, self._ctypes.byref(inp),
                                self._ctypes.sizeof(inp))
 
-    def _send_key(self, vk, up=False):
-        ki = self._KEYBDINPUT(vk, 0, self.KEYEVENTF_KEYUP if up else 0, 0, None)
+    def _send_key(self, vk, up=False, extended=False):
+        flags = self.KEYEVENTF_KEYUP if up else 0
+        if extended:
+            flags |= self.KEYEVENTF_EXTENDEDKEY
+        ki = self._KEYBDINPUT(vk, 0, flags, 0, None)
         inp = self._INPUT(1)  # INPUT_KEYBOARD
+        inp.ki = ki
+        self._user32.SendInput(1, self._ctypes.byref(inp),
+                               self._ctypes.sizeof(inp))
+
+    def _send_unicode(self, code_unit, up=False):
+        """Types a UTF-16 code unit directly, bypassing the keyboard layout."""
+        flags = self.KEYEVENTF_UNICODE
+        if up:
+            flags |= self.KEYEVENTF_KEYUP
+        ki = self._KEYBDINPUT(0, code_unit, flags, 0, None)
+        inp = self._INPUT(1)
         inp.ki = ki
         self._user32.SendInput(1, self._ctypes.byref(inp),
                                self._ctypes.sizeof(inp))
@@ -236,6 +313,22 @@ class WindowsBackend(InputBackend):
             return
         self._send_key(vk, up=False)
         self._send_key(vk, up=True)
+
+    def type_text(self, text):
+        # UTF-16 so characters outside the BMP go out as their surrogate pair.
+        data = text.encode("utf-16-le")
+        for i in range(0, len(data), 2):
+            unit = data[i] | (data[i + 1] << 8)
+            self._send_unicode(unit, up=False)
+            self._send_unicode(unit, up=True)
+
+    def key(self, name):
+        vk = self.NAMED_VK.get(name)
+        if vk is None:
+            return
+        extended = name in self.EXTENDED
+        self._send_key(vk, up=False, extended=extended)
+        self._send_key(vk, up=True, extended=extended)
 
 
 def make_backend(log):
@@ -458,6 +551,12 @@ class RemoteServer:
                 self.backend.release(self._button(msg))
             elif t == "k":
                 self.backend.media(str(msg.get("k", "")))
+            elif t == "type":
+                text = msg.get("s", "")
+                if isinstance(text, str) and text:
+                    self.backend.type_text(text[:MAX_TYPE_CHARS])
+            elif t == "key":
+                self.backend.key(str(msg.get("k", "")))
             elif t == "ping":
                 return {"t": "pong"}
             elif t == "hello":

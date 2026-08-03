@@ -40,6 +40,16 @@ Buttons for left/right click, previous, play/pause, next, and volume.
 The gear icon adjusts pointer sensitivity and scroll speed.
 
 
+KEYBOARD MODE
+-------------
+The keyboard icon in the top right switches the trackpad for a text box.
+Anything you type there is typed on the PC as you go, including backspace
+and autocorrect changes. There are also keys for Esc, Tab, Backspace,
+Enter and the four arrows.
+
+Tap the icon again (or press back once) to return to the trackpad.
+
+
 IF NO PCs SHOW UP
 -----------------
 - The server window must be open on the PC.
