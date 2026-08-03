@@ -76,10 +76,13 @@ MAX_TYPE_CHARS = 512
 # Screen streaming defaults. Every one of them can be overridden per request,
 # so the phone picks what its network can keep up with.
 SCREEN_WIDTH = 960
-SCREEN_FPS = 12
+SCREEN_FPS = 30
 SCREEN_QUALITY = 60
 SCREEN_MAX_WIDTH = 1920
+SCREEN_MAX_FPS = 60
 SCREEN_MAX_VIEWERS = 4
+# How long a motionless screen may go without a frame on the wire.
+SCREEN_KEEPALIVE_S = 1.0
 
 
 # --------------------------------------------------------------------------
@@ -437,7 +440,7 @@ def _bgra_to_rgb(buf):
     return bytes(b)
 
 
-def _downscale_bgra(raw, sw, sh, max_width):
+def _downscale_bgra(raw, sw, sh, max_width, fast=False):
     """Shrink a BGRA buffer to at most max_width. Returns (w, h, bgra)."""
     if sw <= max_width:
         return sw, sh, raw
@@ -448,7 +451,8 @@ def _downscale_bgra(raw, sw, sh, max_width):
         # The channels are mislabelled on purpose: resizing treats them
         # independently, so BGRA in means BGRA out.
         img = Image.frombuffer("RGBA", (sw, sh), raw, "raw", "RGBA", 0, 1)
-        return dw, dh, img.resize((dw, dh), Image.BILINEAR).tobytes()
+        how = Image.NEAREST if fast else Image.BILINEAR
+        return dw, dh, img.resize((dw, dh), how).tobytes()
 
     # No Pillow. An integer step makes every output row one C-level slice,
     # which a per-pixel Python loop could not come close to.
@@ -478,8 +482,16 @@ class ScreenBackend:
         """Native (width, height) of the area being captured."""
         raise NotImplementedError
 
-    def grab(self, max_width, monitor=0):
-        """Capture one frame. Returns (width, height, packed RGB bytes)."""
+    def grab(self, max_width, monitor=0, fast=False):
+        """Capture one frame. Returns (width, height, BGRA bytes).
+
+        BGRA rather than RGB because that is what both Windows and mss hand
+        over, and Pillow can read it directly -- converting in Python first
+        cost more than the JPEG encode itself.
+
+        fast trades the smooth downscale for a much cheaper one, which is what
+        makes a high frame rate possible.
+        """
         raise NotImplementedError
 
 
@@ -497,6 +509,9 @@ class GdiScreenBackend(ScreenBackend):
     SRCCOPY = 0x00CC0020
     CAPTUREBLT = 0x40000000
     HALFTONE = 4
+    # Nearest-neighbour. Roughly thirty times cheaper than HALFTONE, which is
+    # the difference between a slideshow and a smooth picture.
+    COLORONCOLOR = 3
     DIB_RGB_COLORS = 0
     BI_RGB = 0
     CURSOR_SHOWING = 0x0001
@@ -706,7 +721,7 @@ class GdiScreenBackend(ScreenBackend):
         _x, _y, sw, sh = self._region(monitor)
         return sw, sh
 
-    def grab(self, max_width, monitor=0):
+    def grab(self, max_width, monitor=0, fast=False):
         ctypes = self._ctypes
         gdi, user = self._gdi32, self._user32
         x, y, sw, sh = self._region(monitor)
@@ -726,7 +741,8 @@ class GdiScreenBackend(ScreenBackend):
                 out_dc, out_bmp, out_prev = full_dc, full_bmp, full_prev
             else:
                 out_dc, out_bmp, out_prev = self._surface(screen_dc, dw, dh)
-                gdi.SetStretchBltMode(out_dc, self.HALFTONE)
+                gdi.SetStretchBltMode(
+                    out_dc, self.COLORONCOLOR if fast else self.HALFTONE)
                 gdi.SetBrushOrgEx(out_dc, 0, 0, None)
                 gdi.StretchBlt(out_dc, 0, 0, dw, dh,
                                full_dc, 0, 0, sw, sh, self.SRCCOPY)
@@ -752,7 +768,8 @@ class GdiScreenBackend(ScreenBackend):
                 gdi.SelectObject(out_dc, out_bmp)
             if not ok:
                 raise OSError("GetDIBits failed")
-            return dw, dh, _bgra_to_rgb(buf)
+            # Raw BGRA; the encoder reads that shape directly.
+            return dw, dh, bytes(buf)
         finally:
             user.ReleaseDC(None, screen_dc)
 
@@ -823,11 +840,11 @@ class MssScreenBackend(ScreenBackend):
         mon = self._region(monitor)
         return mon["width"], mon["height"]
 
-    def grab(self, max_width, monitor=0):
+    def grab(self, max_width, monitor=0, fast=False):
         shot = self._grabber().grab(self._region(monitor))
         sw, sh = shot.size
-        dw, dh, raw = _downscale_bgra(shot.raw, sw, sh, max_width)
-        return dw, dh, _bgra_to_rgb(raw)
+        dw, dh, raw = _downscale_bgra(shot.raw, sw, sh, max_width, fast)
+        return dw, dh, bytes(raw)
 
 
 def make_screen_backend(log):
@@ -864,7 +881,7 @@ class FrameEncoder:
     name = "none"
     mime = "application/octet-stream"
 
-    def encode(self, width, height, rgb, quality):
+    def encode(self, width, height, bgra, quality):
         raise NotImplementedError
 
 
@@ -880,8 +897,12 @@ class JpegEncoder(FrameEncoder):
         if self._Image is None:
             raise ImportError("Pillow is not installed")
 
-    def encode(self, width, height, rgb, quality):
-        image = self._Image.frombytes("RGB", (width, height), rgb)
+    def encode(self, width, height, bgra, quality):
+        # "BGRX" lets Pillow drop the alpha and swap the channels itself while
+        # it reads the buffer. Doing the same shuffle in Python first produced
+        # byte-identical output and cost more than the encode.
+        image = self._Image.frombuffer("RGB", (width, height), bgra,
+                                       "raw", "BGRX", 0, 1)
         out = io.BytesIO()
         image.save(out, "JPEG", quality=quality)
         return out.getvalue()
@@ -897,7 +918,8 @@ class PngEncoder(FrameEncoder):
     name = "png"
     mime = "image/png"
 
-    def encode(self, width, height, rgb, quality):
+    def encode(self, width, height, bgra, quality):
+        rgb = _bgra_to_rgb(bgra)
         stride = width * 3
         # PNG wants a filter byte in front of every scanline; 0 means "none".
         raw = b"".join(b"\x00" + rgb[i:i + stride]
@@ -931,11 +953,39 @@ class ScreenSource:
         self.backend = backend
         self.encoder = encoder
         self._lock = threading.Lock()
+        self._key = None
+        self._bgra = None
+        self._encoded = None
+        self._w = self._h = 0
+        self._at = 0.0
 
-    def frame(self, width, quality, monitor=0):
+    def frame(self, width, quality, monitor=0, fast=False, max_age=0.0):
+        """Returns (width, height, encoded bytes, changed).
+
+        Two savings live here. A frame captured for one viewer inside the last
+        max_age seconds is handed to the next one instead of grabbing again,
+        so a second phone costs almost nothing. And when the pixels come back
+        identical -- which is most of the time on a desktop that is sitting
+        still -- the previous encode is reused and the caller is told nothing
+        changed, so it can skip the send entirely.
+        """
         with self._lock:
-            w, h, rgb = self.backend.grab(width, monitor)
-            return w, h, self.encoder.encode(w, h, rgb, quality)
+            key = (width, quality, monitor, fast)
+            now = time.monotonic()
+
+            if (key == self._key and self._encoded is not None
+                    and now - self._at <= max_age):
+                return self._w, self._h, self._encoded, False
+
+            w, h, bgra = self.backend.grab(width, monitor, fast)
+            unchanged = (key == self._key and bgra == self._bgra
+                         and self._encoded is not None)
+            data = self._encoded if unchanged \
+                else self.encoder.encode(w, h, bgra, quality)
+
+            self._key, self._bgra, self._encoded = key, bgra, data
+            self._w, self._h, self._at = w, h, now
+            return w, h, data, not unchanged
 
     def monitors(self):
         with self._lock:
@@ -1032,9 +1082,12 @@ class ScreenHandler(http.server.BaseHTTPRequestHandler):
 
     def _stream(self, query):
         width = self._number(query, "w", SCREEN_WIDTH, 160, SCREEN_MAX_WIDTH)
-        fps = self._number(query, "fps", SCREEN_FPS, 1, 30)
+        fps = self._number(query, "fps", SCREEN_FPS, 1, SCREEN_MAX_FPS)
         quality = self._number(query, "q", SCREEN_QUALITY, 10, 95)
         monitor = self._number(query, "mon", 0, 0, 16)
+        # Chasing a high rate is only worth it with the cheap downscale; the
+        # smooth one costs more than the whole rest of the frame.
+        fast = self._number(query, "fast", 1 if fps >= 24 else 0, 0, 1) == 1
 
         if not self.viewers.acquire():
             self.send_error(503, "Too many viewers")
@@ -1052,14 +1105,23 @@ class ScreenHandler(http.server.BaseHTTPRequestHandler):
             mime = self.source.encoder.mime.encode("ascii")
             interval = 1.0 / fps
             due = time.monotonic()
+            last_sent = 0.0
 
             while not self.stop_event.is_set():
-                _w, _h, data = self.source.frame(width, quality, monitor)
-                self.wfile.write(
-                    b"--" + FRAME_BOUNDARY.encode("ascii") + b"\r\n"
-                    b"Content-Type: " + mime + b"\r\n"
-                    b"Content-Length: " + str(len(data)).encode("ascii")
-                    + b"\r\n\r\n" + data + b"\r\n")
+                _w, _h, data, changed = self.source.frame(
+                    width, quality, monitor, fast, max_age=interval * 0.5)
+
+                # A still desktop needs nothing sent: the phone keeps showing
+                # the frame it has. The periodic resend keeps the connection
+                # from looking dead and covers a frame lost on the way.
+                now = time.monotonic()
+                if changed or now - last_sent >= SCREEN_KEEPALIVE_S:
+                    self.wfile.write(
+                        b"--" + FRAME_BOUNDARY.encode("ascii") + b"\r\n"
+                        b"Content-Type: " + mime + b"\r\n"
+                        b"Content-Length: " + str(len(data)).encode("ascii")
+                        + b"\r\n\r\n" + data + b"\r\n")
+                    last_sent = now
 
                 due += interval
                 idle = due - time.monotonic()
@@ -1076,7 +1138,8 @@ class ScreenHandler(http.server.BaseHTTPRequestHandler):
         width = self._number(query, "w", SCREEN_WIDTH, 160, SCREEN_MAX_WIDTH)
         quality = self._number(query, "q", SCREEN_QUALITY, 10, 95)
         monitor = self._number(query, "mon", 0, 0, 16)
-        _w, _h, data = self.source.frame(width, quality, monitor)
+        # A single still is never in a hurry, so it gets the smooth downscale.
+        _w, _h, data, _changed = self.source.frame(width, quality, monitor)
         self._send(self.source.encoder.mime, data)
 
     def _info(self):

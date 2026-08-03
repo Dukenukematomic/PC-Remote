@@ -35,6 +35,8 @@ public class ScreenStream {
     private static final int READ_TIMEOUT_MS = 12000;
     private static final int MAX_FRAME_BYTES = 8 * 1024 * 1024;
     private static final int POOL_LIMIT = 3;
+    /** Roughly a whole frame already queued behind the one just read. */
+    private static final int STALE_BACKLOG_BYTES = 16 * 1024;
 
     public interface Listener {
         /** A decoded frame, on the main thread. Ownership passes to the view. */
@@ -69,7 +71,7 @@ public class ScreenStream {
     private String host;
     private int port;
     private int width = 960;
-    private int fps = 12;
+    private int fps = 60;
     private int quality = 60;
     private volatile int monitor;
 
@@ -265,6 +267,12 @@ public class ScreenStream {
                 if (n < 0) return;
                 read += n;
             }
+
+            // If the next frame is already waiting we are behind the PC, so
+            // this one is stale. Decoding it would only add to the delay
+            // between a swipe and seeing the pointer move, and it would be
+            // painted over immediately anyway.
+            if (in.available() >= STALE_BACKLOG_BYTES) continue;
 
             Bitmap frame = decode(data, length);
             if (frame != null) publish(listener, frame);

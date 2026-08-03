@@ -80,9 +80,25 @@ If the PC has more than one monitor, a row of tabs appears above the
 picture: "All screens" plus one per display, left to right. Tap a tab to
 switch to that monitor. With a single monitor no tabs are shown.
 
-The picture is scaled to your phone's width and sent at about 12 frames
-a second. It is meant for glancing at what the pointer is doing and for
-pausing something from the sofa, not for video.
+The picture is scaled to your phone's width. The app asks for 60 frames a
+second and the PC sends as many as it can manage.
+
+What it actually manages depends on the monitor, because the cost is in
+reading the screen and that scales with how many pixels the monitor has -
+not with how small a picture is being sent:
+
+  1920x1080 monitor .......... roughly 40-60 fps
+  2560x1440 monitor .......... roughly 25-45 fps
+  3840x2160 monitor .......... roughly 15-20 fps
+  "All screens" on a multi-monitor PC ... under 10 fps
+
+Pick a single monitor from the tabs rather than "All screens" if you want
+it smooth. On a four-monitor PC "All screens" is capturing more than 20
+million pixels per frame and cannot keep up, quite apart from being too
+small to read on a phone.
+
+Lowering the width does not speed it up much, since the expensive part is
+reading the monitor rather than sending the picture.
 
 To run the trackpad with no screen sharing at all:
 
